@@ -13,14 +13,18 @@ import android.widget.Toast;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.util.concurrent.TimeUnit;
 
 /** Small settings screen: LSPosed shows its launch button for modules that have one. */
 public final class SettingsActivity extends Activity {
     private static final String CAMERA_PACKAGE = "com.oplus.camera";
     private static final String CAMERA_ACTIVITY = "com.oplus.camera.Camera";
+    private static final String BUTTON_TEXT = "重启相机（需要 root）";
 
     private TextView status;
+    private Button applyButton;
     private String rootError = "";
+    private volatile boolean running = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,20 +53,20 @@ public final class SettingsActivity extends Activity {
         desc.setPadding(0, dp(12), 0, dp(28));
         root.addView(desc);
 
-        Button apply = new Button(this);
-        apply.setText("重启相机（需要 root）");
-        apply.setAllCaps(false);
-        apply.setTextSize(16);
-        apply.setTextColor(Color.BLACK);
-        apply.setBackgroundColor(Color.parseColor("#FFC107"));
-        apply.setPadding(dp(8), dp(14), dp(8), dp(14));
-        apply.setOnClickListener(new View.OnClickListener() {
+        applyButton = new Button(this);
+        applyButton.setText(BUTTON_TEXT);
+        applyButton.setAllCaps(false);
+        applyButton.setTextSize(16);
+        applyButton.setTextColor(Color.BLACK);
+        applyButton.setBackgroundColor(Color.parseColor("#FFC107"));
+        applyButton.setPadding(dp(8), dp(14), dp(8), dp(14));
+        applyButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 applyNow();
             }
         });
-        root.addView(apply);
+        root.addView(applyButton);
 
         status = new TextView(this);
         status.setTextColor(Color.parseColor("#80CBC4"));
@@ -83,30 +87,41 @@ public final class SettingsActivity extends Activity {
     }
 
     private void applyNow() {
+        if (running) {
+            return;
+        }
+        running = true;
+        applyButton.setEnabled(false);
+        applyButton.setText("正在重启…");
         status.setText("正在重启相机…");
+        rootError = "";
+
         new Thread(new Runnable() {
             @Override
             public void run() {
-                final boolean rooted = forceStopWithRoot();
-                if (!rooted) {
+                boolean rooted = false;
+                try {
+                    rooted = forceStopWithRoot();
+                } finally {
+                    final boolean success = rooted;
+                    if (success) {
+                        try {
+                            Thread.sleep(600);
+                        } catch (InterruptedException ignored) {
+                        }
+                    }
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
-                            showManualRestartRequired();
+                            setBusy(false);
+                            if (success) {
+                                openCamera();
+                            } else {
+                                showManualRestartRequired();
+                            }
                         }
                     });
-                    return;
                 }
-                try {
-                    Thread.sleep(600);
-                } catch (InterruptedException ignored) {
-                }
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        openCamera();
-                    }
-                });
             }
         }).start();
     }
@@ -114,16 +129,27 @@ public final class SettingsActivity extends Activity {
     private boolean forceStopWithRoot() {
         String[] candidates = new String[]{"/product/bin/su", "su", "/debug_ramdisk/su"};
         for (String su : candidates) {
+            Process process = null;
             try {
-                Process process = Runtime.getRuntime().exec(
+                process = Runtime.getRuntime().exec(
                         new String[]{su, "-c", "am force-stop " + CAMERA_PACKAGE});
-                int code = process.waitFor();
+                boolean finished = process.waitFor(6, TimeUnit.SECONDS);
+                if (!finished) {
+                    process.destroy();
+                    rootError = su + " timeout";
+                    continue;
+                }
+                int code = process.exitValue();
                 if (code == 0) {
                     return true;
                 }
                 rootError = su + " exit=" + code + " " + read(process.getErrorStream());
             } catch (Throwable throwable) {
                 rootError = su + " " + throwable.getClass().getSimpleName();
+            } finally {
+                if (process != null) {
+                    process.destroy();
+                }
             }
         }
         return false;
@@ -141,6 +167,12 @@ public final class SettingsActivity extends Activity {
         } catch (Throwable ignored) {
             return "";
         }
+    }
+
+    private void setBusy(boolean busy) {
+        running = busy;
+        applyButton.setEnabled(!busy);
+        applyButton.setText(busy ? "正在重启…" : BUTTON_TEXT);
     }
 
     private void showManualRestartRequired() {

@@ -43,7 +43,7 @@ app/src/main/java/dev/codex/ricohfullzoom/
 app/src/main/AndroidManifest.xml
 app/src/main/assets/xposed_init
 app/src/main/res/mipmap-*/ic_launcher.png
-dist/app-debug.apk         # 已构建好的 debug 签名 APK（可删）
+dist/理光模式全焦段-1.0.0.apk   # 已构建好的 debug 签名 APK（可删）
 ```
 
 ## 构建
@@ -60,7 +60,7 @@ Windows：
 gradlew.bat :app:assembleDebug
 ```
 
-产物：`app/build/outputs/apk/debug/app-debug.apk`。
+产物：`app/build/outputs/apk/debug/理光模式全焦段-1.0.0.apk`。
 
 `de.robv.android.xposed:api:82` 仅 `compileOnly`，不会打进 APK。
 
@@ -88,3 +88,7 @@ gradlew.bat :app:assembleDebug
 ## 回滚
 
 LSPosed 中取消启用（或取消 `com.oplus.camera` 作用域），强制停止相机；也可以直接卸载 `dev.codex.ricohfullzoom`。模块没有写入任何相机或系统数据。
+
+## 许可
+
+MIT License，见 [LICENSE](LICENSE)。

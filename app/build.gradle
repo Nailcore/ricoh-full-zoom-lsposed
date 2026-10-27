@@ -13,6 +13,13 @@ android {
         versionCode 1
         versionName '1.0.0'
     }
+
+    // Keep the shipped file name aligned with the launcher label.
+    applicationVariants.all { variant ->
+        variant.outputs.all {
+            outputFileName = "理光模式全焦段-${variant.versionName}.apk"
+        }
+    }
 }
 
 dependencies {
